@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gomoku-front",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "front", "dev"],
+      "port": 1420
+    }
+  ]
+}

@@ -1,0 +1,285 @@
+@import "./assets/fonts.css";
+
+/* ------------------------------------------------------------------ */
+/* Jetons de design — repris tels quels de la maquette                  */
+/* ------------------------------------------------------------------ */
+
+:root {
+  --ink-900: #14131a;
+  --ink-700: #2a2733;
+  --ink-500: #4a4557;
+  --ink-300: #7b7490;
+
+  --paper-50: #fdf8ec;
+  --paper-100: #f7eedb;
+  --paper-200: #ede0c6;
+  --paper-300: #dccba9;
+
+  --cinnabar-300: #f08a72;
+  --cinnabar-500: #d64933;
+  --cinnabar-700: #a32e1e;
+
+  --gold-300: #f7d77a;
+  --gold-500: #e8b04b;
+  --gold-700: #b9822c;
+
+  --jade-300: #7fd1bc;
+  --jade-500: #2e9e86;
+  --jade-700: #1c6b5c;
+
+  --indigo-500: #7a2420;
+  --indigo-700: #4a1512;
+  --indigo-900: #2b0e10;
+
+  --board-wood: #e3c088;
+  --board-wood-deep: #cda669;
+  --board-line: #5a4326;
+  --board-edge: #8a6836;
+
+  --stone-black-fill: #1c1b22;
+  --stone-black-spec: #6f6a88;
+  --stone-white-fill: #faf5ea;
+  --stone-white-shade: #d9cdb6;
+
+  /* Ombres « cel » : aplat décalé, jamais de flou gris. */
+  --shadow-cel: 0 3px 0 rgba(20, 19, 26, 0.28);
+  --shadow-cel-lg: 0 6px 0 rgba(20, 19, 26, 0.28);
+  --shadow-panel: 0 10px 28px rgba(18, 26, 51, 0.22);
+
+  --stroke: 2.5px solid var(--ink-900);
+  --stroke-thin: 2px solid var(--ink-900);
+
+  --font-display: "Yuji Syuku", serif;
+  --font-ui: "Baloo 2", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------ */
+/* Base                                                                 */
+/* ------------------------------------------------------------------ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #1c0809;
+  color: var(--paper-50);
+  font-family: var(--font-ui);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 3px solid var(--gold-300);
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Motifs réutilisés                                                    */
+/* ------------------------------------------------------------------ */
+
+/* Petite étiquette capitale — les intitulés de section de la maquette. */
+.label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.label-light {
+  color: var(--paper-300);
+}
+
+/* Carte de papier à contour noir. */
+.panel {
+  border: var(--stroke);
+  border-radius: 20px;
+  background: var(--paper-100);
+  box-shadow: var(--shadow-cel-lg);
+  color: var(--ink-900);
+}
+
+/* Bouton plein, qui s'enfonce sur son ombre au clic. */
+.cel-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border: var(--stroke);
+  border-radius: 12px;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink-900);
+  background: var(--paper-200);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.cel-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.cel-button:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: none !important;
+}
+
+.cel-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cel-button.is-active {
+  background: var(--cinnabar-500);
+  color: var(--paper-50);
+  box-shadow: var(--shadow-cel);
+}
+
+/* Pastille d'information. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: var(--stroke-thin);
+  border-radius: 999px;
+  background: var(--paper-200);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.dot {
+  flex: none;
+  border-radius: 999px;
+}
+
+.stone-dot {
+  border: var(--stroke);
+  border-radius: 999px;
+  flex: none;
+}
+
+.stone-dot.black {
+  background: var(--stone-black-fill);
+}
+
+.stone-dot.white {
+  background: var(--stone-white-fill);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ */
+/* Animations — décor lent, réactions courtes                           */
+/* ------------------------------------------------------------------ */
+
+@keyframes gk-drift {
+  from { transform: translate3d(-3%, 0, 0); }
+  to { transform: translate3d(3%, 0, 0); }
+}
+
+@keyframes gk-mist {
+  from { transform: translate3d(-4%, 0, 0); }
+  to { transform: translate3d(4%, 0, 0); }
+}
+
+@keyframes gk-fall {
+  0% { transform: translate3d(0, -60px, 0) rotate(0deg); opacity: 0; }
+  8% { opacity: 0.55; }
+  92% { opacity: 0.55; }
+  100% { transform: translate3d(110px, 1160px, 0) rotate(240deg); opacity: 0; }
+}
+
+@keyframes gk-aura {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.09); opacity: 0.75; }
+}
+
+@keyframes gk-marker {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+@keyframes gk-speed {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-26px, 0, 0); }
+}
+
+@keyframes gk-dots {
+  0%, 100% { opacity: 0.18; }
+  50% { opacity: 1; }
+}
+
+@keyframes gk-dragon {
+  from { transform: translate3d(-8%, 0, 0); }
+  to { transform: translate3d(8%, 0, 0); }
+}
+
+@keyframes gk-drop {
+  0% { transform: translateY(-14px) scale(0.86); opacity: 0; }
+  60% { transform: translateY(2px) scale(1.04); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes gk-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+@keyframes gk-banner {
+  from { transform: translateX(-120%) rotate(-3deg); }
+  to { transform: translateX(0) rotate(-3deg); }
+}
+
+/* Entrée d'écran. Volontairement sans fill-mode : si l'animation ne démarre
+   jamais (fenêtre masquée), l'écran s'affiche simplement sans mouvement. */
+@keyframes gk-screen-in {
+  from { transform: translateY(5%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes gk-rise {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

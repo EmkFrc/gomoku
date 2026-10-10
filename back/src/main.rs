@@ -1,5 +1,8 @@
 use std::io;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Clone, Copy, PartialEq)]
 enum Cell {
     Empty,
@@ -17,7 +20,8 @@ type Board = [[Cell; 19]; 19];
 
 enum Input {
     Move(usize, usize),
-    Undo,               
+    Undo,
+    Quit,               
 }
 
 struct Move {
@@ -45,9 +49,25 @@ impl Game {
         }
     }
     fn is_valid_move(&self, x: usize, y: usize) -> bool {
-        x < 19 && y < 19 && self.board[y][x] == Cell::Empty
+        x < 19 && y < 19 && self.board[y][x] == Cell::Empty && !self.is_double_three(x, y)
+    }
+    fn is_double_three(&self, x: usize, y: usize) -> bool {
+        let (me, opp) = match self.turn {
+            Stone::Black => (Cell::Black, Cell::White),
+            Stone::White => (Cell::White, Cell::Black),
+        };
+        let mut b = self.board;
+        b[y][x] = me;
+        if !find_captures(&b, x, y, me, opp).is_empty() {
+            return false;
+        }
+        count_free_threes(&b, x, y, me) >= 2
     }
     fn play(&mut self, x: usize, y: usize) -> bool {
+        let pending = match self.history.last() {
+            Some(last) => find_lines(&self.board, last.x, last.y),
+            None => Vec::new(),
+        };
 
         let (me, opp) = match self.turn {
             Stone::Black => (Cell::Black, Cell::White),
@@ -74,8 +94,26 @@ impl Game {
             return true;
         }
 
-        if !find_lines(&self.board, x, y).is_empty() {
-            return true; 
+        if !pending.is_empty() && lines_still_standing(&self.board, &pending, opp) {
+            self.turn = match self.turn {
+                Stone::Black => Stone::White,
+                Stone::White => Stone::Black,
+            };
+            return true;
+        }
+
+        let lines = find_lines(&self.board, x, y);
+        if !lines.is_empty() {
+            let opp_captured = match self.turn {
+                Stone::Black => self.captured_white,
+                Stone::White => self.captured_black,
+            };
+            let breakable = can_break_lines(&self.board, &lines, me, opp);
+            let opp_wins_by_capture = opp_captured >= 8 && can_capture_any(&self.board, opp, me);
+
+            if !breakable && !opp_wins_by_capture {
+                return true;
+            }
         }
 
 
@@ -136,8 +174,9 @@ fn board_frame(board: &Board)
 
 fn read_move() -> Option<Input> {
     let mut input = String::new();
-    if io::stdin().read_line(&mut input).is_err() {
-        return None;
+    match io::stdin().read_line(&mut input) {
+        Ok(0) | Err(_) => return Some(Input::Quit),
+        Ok(_) => {}
     }
 
     let parts: Vec<&str> = input.trim().split_whitespace().collect();
@@ -168,9 +207,12 @@ fn ask_move(game: &Game) -> Input {
 
         match read_move() {
             Some(Input::Undo) => return Input::Undo,
+            Some(Input::Quit) => return Input::Quit,
             Some(Input::Move(x, y)) => {
                 if game.is_valid_move(x, y) {
                     return Input::Move(x, y);   
+                } else if x < 19 && y < 19 && game.board[y][x] == Cell::Empty {
+                    println!("Coup interdit : double-trois, réessaie");
                 } else {
                     println!("Case invalide ou occupée, réessaie");
                 }
@@ -198,6 +240,10 @@ fn gomoku()
             }
             Input::Undo => {
                 game.undo();
+            }
+            Input::Quit => {
+                println!("Entrée fermée, fin de la partie");
+                return;
             }
         }
     }
@@ -230,9 +276,6 @@ fn count_dir(board: &Board, x: usize, y: usize, dx: i32, dy: i32, cell: Cell) ->
     count
 }
 
-// Alignements de 5 pierres ou plus passant par (x, y). Une liste vide = pas d'alignement.
-// Chaque ligne donne toutes ses coordonnées, d'un bout à l'autre : il en faut la liste
-// pour savoir si l'adversaire peut la casser par une capture.
 fn find_lines(board: &Board, x: usize, y: usize) -> Vec<Vec<(usize, usize)>> {
     let mut lines = Vec::new();
     let cell = board[y][x];
@@ -245,7 +288,6 @@ fn find_lines(board: &Board, x: usize, y: usize) -> Vec<Vec<(usize, usize)>> {
         let after = count_dir(board, x, y, dx, dy, cell);
         let total = before + 1 + after;
         if total >= 5 {
-            // première pierre de la ligne : `before` pas en arrière
             let start_x = x as i32 - dx * before as i32;
             let start_y = y as i32 - dy * before as i32;
             let mut line = Vec::new();
@@ -284,6 +326,86 @@ fn find_captures(board: &Board, x: usize, y: usize, me: Cell, opp: Cell) -> Vec<
         }
     }
     return found
+}
+
+fn can_break_lines(board: &Board, lines: &Vec<Vec<(usize, usize)>>, me: Cell, opp: Cell) -> bool 
+{
+    for py in 0..19 
+    {
+        for px in 0..19 
+        {
+            if board[py][px] != Cell::Empty 
+            {
+                continue;
+            }
+            let mut b = *board; 
+            b[py][px] = opp;
+            let caps = find_captures(&b, px, py, opp, me);
+            if caps.is_empty() {
+                continue;
+            }
+            for &(cx, cy) in &caps 
+            {
+                b[cy][cx] = Cell::Empty;
+            }
+
+            if !lines_still_standing(&b, lines, me) 
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn lines_still_standing(board: &Board, lines: &Vec<Vec<(usize, usize)>>, me: Cell) -> bool 
+{
+    lines.iter().flatten().any(|&(lx, ly)| 
+    {
+        board[ly][lx] == me && !find_lines(board, lx, ly).is_empty()
+    })
+}
+
+fn can_capture_any(board: &Board, opp: Cell, me: Cell) -> bool 
+{
+    for py in 0..19 
+    {
+        for px in 0..19 
+        {
+            if board[py][px] == Cell::Empty && !find_captures(board, px, py, opp, me).is_empty() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+
+fn count_free_threes(board: &Board, x: usize, y: usize, me: Cell) -> usize {
+    let mut count = 0;
+    for (dx, dy) in DIRECTIONS 
+    {
+        for k in -3..=3 
+        {
+            if k == 0 || cell_at(board, x, y, dx, dy, k) != Some(Cell::Empty) 
+            {
+                continue;
+            }
+            let mut b = *board;
+            b[(y as i32 + dy * k) as usize][(x as i32 + dx * k) as usize] = me;
+            let before = count_dir(&b, x, y, -dx, -dy, me) as i32;
+            let after = count_dir(&b, x, y, dx, dy, me) as i32;
+            if before + 1 + after == 4
+                && -before <= k && k <= after
+                && cell_at(&b, x, y, dx, dy, -before - 1) == Some(Cell::Empty)
+                && cell_at(&b, x, y, dx, dy, after + 1) == Some(Cell::Empty)
+            {
+                count += 1;
+                break;
+            }
+        }
+    }
+    count
 }
 
 fn main()

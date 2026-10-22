@@ -22,24 +22,18 @@ import {
 /** Tauri injecte cet objet dans la webview ; un navigateur nu ne l'a pas. */
 export const hasBackend = "__TAURI_INTERNALS__" in window;
 
-/** Vrai dès qu'une commande Rust a échoué : on ne retente plus pour rien. */
-let backendBroken = false;
-
-export function backendAvailable(): boolean {
-  return hasBackend && !backendBroken;
-}
-
+/**
+ * Sous Tauri, le moteur Rust est la seule source de vérité : une erreur remonte
+ * telle quelle (on ne mélange jamais une partie Rust et une partie de secours).
+ * Le moteur de secours ne sert que dans un navigateur nu.
+ */
 async function call<T>(command: string, args: Record<string, unknown>, fallback: () => T | Promise<T>): Promise<T> {
-  if (!backendAvailable()) return fallback();
+  if (!hasBackend) return fallback();
   try {
     return await invoke<T>(command, args);
   } catch (error) {
-    backendBroken = true;
-    console.warn(
-      `[api] la commande « ${command} » a échoué, bascule sur le moteur de secours.`,
-      error,
-    );
-    return fallback();
+    console.warn(`[api] la commande « ${command} » a échoué :`, error);
+    throw error;
   }
 }
 

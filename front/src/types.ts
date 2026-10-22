@@ -93,7 +93,7 @@ export interface Suggestion {
 }
 
 export const DEFAULT_CONFIG: GameConfig = {
-  mode: "vs-ai",
+  mode: "hotseat",
   aiColor: "white",
   opening: "pro",
   boardSize: BOARD_SIZE,

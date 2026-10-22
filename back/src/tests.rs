@@ -2,11 +2,18 @@
 // Lancer : cargo test            (tout)
 //          cargo test captures   (un seul chapitre)
 
-use super::*;
+use crate::board::*;
+use crate::cli::*;
+use crate::game::*;
+use crate::minmax::*;
+use crate::rules::*;
+
+const B: Option<Stone> = Some(Stone::Black);
+const W: Option<Stone> = Some(Stone::White);
 
 // Plateau avec des pierres noires et blanches posées à la main.
 fn board(black: &[(usize, usize)], white: &[(usize, usize)]) -> Board {
-    let mut b: Board = [[Cell::Empty; 19]; 19];
+    let mut b = empty_board();
     for &(x, y) in black {
         b[y][x] = Cell::Black;
     }
@@ -202,18 +209,30 @@ mod chapitre_3_partie {
         assert!(g.board[3][4] == Cell::Empty && g.board[3][5] == Cell::Empty);
         assert_eq!(g.captured_black, 2);
         assert_eq!(g.captured_white, 0);
-        assert_eq!(sorted(g.history.last().unwrap().captures.clone()), vec![(4, 3), (5, 3)]);
+        assert_eq!(
+            sorted(g.history.last().unwrap().captures.clone()),
+            vec![(4, 3), (5, 3)]
+        );
     }
 
     #[test]
     fn historique_contient_le_coup_gagnant() {
         let mut g = Game::new();
-        let mut win = false;
-        for &(x, y) in &[(0, 0), (0, 5), (1, 0), (0, 6), (2, 0), (0, 7), (3, 0), (0, 8), (4, 0)] {
-            win = g.play(x, y);
+        let mut winner = None;
+        for &(x, y) in &[
+            (0, 0),
+            (0, 5),
+            (1, 0),
+            (0, 6),
+            (2, 0),
+            (0, 7),
+            (3, 0),
+            (0, 8),
+            (4, 0),
+        ] {
+            winner = g.play(x, y);
         }
-        assert!(win);
-        assert!(g.turn == Stone::Black);
+        assert_eq!(winner, B);
         assert_eq!(g.history.len(), 9);
         let last = g.history.last().unwrap();
         assert_eq!((last.x, last.y), (4, 0));
@@ -222,7 +241,7 @@ mod chapitre_3_partie {
     #[test]
     fn plateau_plein() {
         let mut g = Game::new();
-        g.board = [[Cell::Black; 19]; 19];
+        g.board = [[Cell::Black; SIZE]; SIZE];
         assert!(g.is_full());
         g.board[9][9] = Cell::Empty;
         assert!(!g.is_full());
@@ -235,22 +254,46 @@ mod chapitre_4_annulation {
     #[test]
     fn chaque_undo_retrouve_l_etat_exact() {
         let moves = [
-            (3, 3), (4, 3), (10, 10), (5, 3), (6, 3),
-            (7, 7), (7, 8), (0, 0), (7, 9), (7, 10),
-            (6, 12), (4, 12), (3, 15), (5, 12), (15, 0), (3, 13), (15, 2), (3, 14),
+            (3, 3),
+            (4, 3),
+            (10, 10),
+            (5, 3),
+            (6, 3),
+            (7, 7),
+            (7, 8),
+            (0, 0),
+            (7, 9),
+            (7, 10),
+            (6, 12),
+            (4, 12),
+            (3, 15),
+            (5, 12),
+            (15, 0),
+            (3, 13),
+            (15, 2),
+            (3, 14),
             (3, 12),
         ];
         let mut g = Game::new();
         let mut snaps = Vec::new();
         for &(x, y) in moves.iter() {
-            snaps.push((g.board, g.turn == Stone::Black, g.captured_black, g.captured_white));
+            snaps.push((
+                g.board,
+                g.turn == Stone::Black,
+                g.captured_black,
+                g.captured_white,
+            ));
             g.play(x, y);
         }
         assert_eq!((g.captured_black, g.captured_white), (6, 2));
         for i in (0..moves.len()).rev() {
             assert!(g.undo());
             let (b, black, cb, cw) = snaps[i];
-            assert!(g.board == b, "plateau différent après l'annulation du coup {}", i);
+            assert!(
+                g.board == b,
+                "plateau différent après l'annulation du coup {}",
+                i
+            );
             assert_eq!(g.turn == Stone::Black, black);
             assert_eq!((g.captured_black, g.captured_white), (cb, cw));
         }
@@ -277,10 +320,17 @@ mod chapitre_5_victoire_par_capture {
     use super::*;
 
     // 5 captures noires séparées, sans alignement possible
-    fn cinq_captures(g: &mut Game) -> Vec<bool> {
+    fn cinq_captures(g: &mut Game) -> Vec<Option<Stone>> {
         let mut wins = Vec::new();
         for r in 0..5usize {
-            let seq = [(2 * r, r), (2 * r + 1, r), (18, 2 * r), (2 * r + 2, r), (2 * r + 3, r), (16, 3 * r)];
+            let seq = [
+                (2 * r, r),
+                (2 * r + 1, r),
+                (18, 2 * r),
+                (2 * r + 2, r),
+                (2 * r + 3, r),
+                (16, 3 * r),
+            ];
             for (k, &(x, y)) in seq.iter().enumerate() {
                 if r == 4 && k == 5 {
                     break;
@@ -297,9 +347,8 @@ mod chapitre_5_victoire_par_capture {
     #[test]
     fn dix_pierres_capturees_gagnent() {
         let mut g = Game::new();
-        assert_eq!(cinq_captures(&mut g), vec![false, false, false, false, true]);
+        assert_eq!(cinq_captures(&mut g), vec![None, None, None, None, B]);
         assert_eq!(g.captured_black, 10);
-        assert!(g.turn == Stone::Black);
     }
 
     #[test]
@@ -309,7 +358,7 @@ mod chapitre_5_victoire_par_capture {
         g.undo();
         assert_eq!(g.captured_black, 8);
         assert!(g.board[4][9] == Cell::White && g.board[4][10] == Cell::White);
-        assert!(g.play(11, 4));
+        assert_eq!(g.play(11, 4), B);
     }
 }
 
@@ -323,28 +372,28 @@ mod chapitre_6_ligne_cassable {
 
     #[test]
     fn ligne_impossible_a_casser_gagne_tout_de_suite() {
-        assert!(game(&four(), &[]).play(7, 5));
+        assert_eq!(game(&four(), &[]).play(7, 5), B);
     }
 
     #[test]
     fn paire_de_la_ligne_capturable_la_partie_continue() {
         let mut b = four();
         b.push((4, 6));
-        assert!(!game(&b, &[(4, 7)]).play(7, 5));
+        assert_eq!(game(&b, &[(4, 7)]).play(7, 5), None);
     }
 
     #[test]
     fn paire_capturable_hors_de_la_ligne_ne_sauve_pas() {
         let mut b = four();
         b.extend([(12, 12), (12, 13)]);
-        assert!(game(&b, &[(12, 14)]).play(7, 5));
+        assert_eq!(game(&b, &[(12, 14)]).play(7, 5), B);
     }
 
     #[test]
     fn ligne_de_six_capturer_le_bout_laisse_cinq() {
         let mut b = row(3..8, 5);
         b.push((3, 6));
-        assert!(game(&b, &[(3, 7)]).play(8, 5));
+        assert_eq!(game(&b, &[(3, 7)]).play(8, 5), B);
     }
 
     #[test]
@@ -353,7 +402,7 @@ mod chapitre_6_ligne_cassable {
         b.extend([(12, 12), (12, 13)]);
         let mut g = game(&b, &[(12, 14)]);
         g.captured_white = 8;
-        assert!(!g.play(7, 5));
+        assert_eq!(g.play(7, 5), None);
     }
 
     #[test]
@@ -362,26 +411,46 @@ mod chapitre_6_ligne_cassable {
         b.extend([(12, 12), (12, 13)]);
         let mut g = game(&b, &[(12, 14)]);
         g.captured_white = 6;
-        assert!(g.play(7, 5));
+        assert_eq!(g.play(7, 5), B);
     }
 
     #[test]
     fn adversaire_a_huit_mais_aucune_capture_possible() {
         let mut g = game(&four(), &[]);
         g.captured_white = 8;
-        assert!(g.play(7, 5));
+        assert_eq!(g.play(7, 5), B);
     }
 
     #[test]
     fn croix_une_seule_ligne_cassee_gagne() {
-        let b = [(3, 5), (4, 5), (6, 5), (7, 5), (5, 3), (5, 4), (5, 6), (5, 7), (3, 6)];
-        assert!(game(&b, &[(3, 7)]).play(5, 5));
+        let b = [
+            (3, 5),
+            (4, 5),
+            (6, 5),
+            (7, 5),
+            (5, 3),
+            (5, 4),
+            (5, 6),
+            (5, 7),
+            (3, 6),
+        ];
+        assert_eq!(game(&b, &[(3, 7)]).play(5, 5), B);
     }
 
     #[test]
     fn croix_une_capture_casse_les_deux_lignes() {
-        let b = [(3, 5), (4, 5), (6, 5), (7, 5), (5, 3), (5, 4), (5, 6), (5, 7), (4, 6)];
-        assert!(!game(&b, &[(4, 7)]).play(5, 5));
+        let b = [
+            (3, 5),
+            (4, 5),
+            (6, 5),
+            (7, 5),
+            (5, 3),
+            (5, 4),
+            (5, 6),
+            (5, 7),
+            (4, 6),
+        ];
+        assert_eq!(game(&b, &[(4, 7)]).play(5, 5), None);
     }
 }
 
@@ -397,18 +466,17 @@ mod chapitre_7_ligne_en_attente {
     #[test]
     fn adversaire_ne_casse_pas_l_aligneur_gagne() {
         let mut g = breakable();
-        assert!(!g.play(7, 5));
-        assert!(g.play(15, 15));
-        assert!(g.turn == Stone::Black);
+        assert_eq!(g.play(7, 5), None);
+        assert_eq!(g.play(15, 15), B);
     }
 
     #[test]
     fn adversaire_casse_la_partie_continue() {
         let mut g = breakable();
         g.play(7, 5);
-        assert!(!g.play(4, 4));
+        assert_eq!(g.play(4, 4), None);
         assert!(g.board[5][4] == Cell::Empty);
-        assert!(!g.play(0, 18));
+        assert_eq!(g.play(0, 18), None);
     }
 
     #[test]
@@ -418,7 +486,7 @@ mod chapitre_7_ligne_en_attente {
         g.play(15, 15);
         g.undo();
         assert!(g.turn == Stone::White);
-        assert!(!g.play(4, 4));
+        assert_eq!(g.play(4, 4), None);
     }
 
     #[test]
@@ -428,8 +496,7 @@ mod chapitre_7_ligne_en_attente {
         let mut g = game(&b, &[(12, 14)]);
         g.captured_white = 8;
         g.play(7, 5);
-        assert!(g.play(12, 11));
-        assert!(g.turn == Stone::White);
+        assert_eq!(g.play(12, 11), W);
         assert_eq!(g.captured_white, 10);
     }
 
@@ -440,8 +507,7 @@ mod chapitre_7_ligne_en_attente {
         let mut g = game(&b, &[(12, 14)]);
         g.captured_white = 8;
         g.play(7, 5);
-        assert!(g.play(15, 15));
-        assert!(g.turn == Stone::Black);
+        assert_eq!(g.play(15, 15), B);
     }
 
     #[test]
@@ -450,15 +516,19 @@ mod chapitre_7_ligne_en_attente {
         b.push((4, 6));
         let mut g = game(&b, &[(4, 7), (10, 0), (11, 0), (12, 0), (13, 0)]);
         g.play(7, 5);
-        assert!(g.play(14, 0));
-        assert!(g.turn == Stone::Black);
+        assert_eq!(g.play(14, 0), B);
     }
 }
 
 mod chapitre_8_trois_libre {
     use super::*;
 
-    fn free_threes(black: &[(usize, usize)], white: &[(usize, usize)], x: usize, y: usize) -> usize {
+    fn free_threes(
+        black: &[(usize, usize)],
+        white: &[(usize, usize)],
+        x: usize,
+        y: usize,
+    ) -> usize {
         let mut b = board(black, white);
         b[y][x] = Cell::Black;
         count_free_threes(&b, x, y, Cell::Black)
@@ -548,7 +618,13 @@ mod chapitre_9_double_trois {
     fn double_quatre_et_quatre_trois_autorises() {
         assert!(game(&[(4, 9), (5, 9), (6, 9), (7, 6), (7, 7), (7, 8)], &[]).is_valid_move(7, 9));
         assert!(game(&[(4, 9), (5, 9), (6, 9), (7, 7), (7, 8)], &[]).is_valid_move(7, 9));
-        assert!(game(&[(5, 9), (6, 9), (8, 9), (9, 9), (7, 6), (7, 7), (7, 8)], &[]).is_valid_move(7, 9));
+        assert!(
+            game(
+                &[(5, 9), (6, 9), (8, 9), (9, 9), (7, 6), (7, 7), (7, 8)],
+                &[]
+            )
+            .is_valid_move(7, 9)
+        );
     }
 
     #[test]
@@ -562,5 +638,135 @@ mod chapitre_9_double_trois {
     fn case_occupee_ou_hors_plateau() {
         assert!(!game(&[(5, 5)], &[]).is_valid_move(5, 5));
         assert!(!game(&[], &[]).is_valid_move(19, 3));
+    }
+}
+
+mod chapitre_10_saisie {
+    use super::*;
+
+    #[test]
+    fn coordonnees() {
+        assert_eq!(parse_input("3 4\n"), Some(Input::Move(3, 4)));
+        assert_eq!(parse_input("  5    6  "), Some(Input::Move(5, 6)));
+    }
+
+    #[test]
+    fn annuler() {
+        assert_eq!(parse_input("return\n"), Some(Input::Undo));
+    }
+
+    #[test]
+    fn entrees_invalides() {
+        for line in ["", "\n", "abc", "3", "3 4 5", "-1 2", "3 x", "return 2"] {
+            assert_eq!(parse_input(line), None, "entrée {:?}", line);
+        }
+    }
+}
+
+mod chapitre_11_candidats {
+    use super::*;
+
+    #[test]
+    fn plateau_vide_on_joue_au_centre() {
+        assert_eq!(candidates(&Game::new()), vec![(9, 9)]);
+    }
+
+    #[test]
+    fn une_pierre_au_centre_donne_24_cases() {
+        let c = candidates(&game(&[(9, 9)], &[]));
+        assert_eq!(c.len(), 24);
+        assert!(c.iter().all(|&(x, y)| x.abs_diff(9) <= 2 && y.abs_diff(9) <= 2));
+        assert!(!c.contains(&(9, 9)));
+    }
+
+    #[test]
+    fn une_pierre_dans_le_coin_reste_dans_le_plateau() {
+        // carré 5 × 5 coupé par les bords : 3 × 3 - la pierre = 8 cases
+        assert_eq!(candidates(&game(&[(0, 0)], &[])).len(), 8);
+    }
+
+    #[test]
+    fn deux_pierres_proches_pas_de_doublon() {
+        let c = candidates(&game(&[(9, 9)], &[(10, 9)]));
+        let mut uniq = c.clone();
+        uniq.sort();
+        uniq.dedup();
+        assert_eq!(c.len(), uniq.len());
+        assert_eq!(c.len(), 6 * 5 - 2);
+    }
+
+    #[test]
+    fn jamais_de_case_occupee() {
+        let g = game(&[(9, 9), (10, 10)], &[(9, 10), (10, 9)]);
+        assert!(candidates(&g).iter().all(|&(x, y)| g.board[y][x] == Cell::Empty));
+    }
+
+    #[test]
+    fn le_double_trois_n_est_pas_propose() {
+        // exemple du sujet : (9, 9) est interdit aux noirs
+        let g = game(&[(6, 6), (7, 7), (10, 9), (11, 9)], &[]);
+        let c = candidates(&g);
+        assert!(!c.contains(&(9, 9)));
+        assert!(c.contains(&(8, 9)));
+    }
+}
+
+mod chapitre_12_evaluation {
+    use super::*;
+    use crate::eval::evaluate;
+
+    #[test]
+    fn plateau_vide_note_nulle() {
+        assert_eq!(evaluate(&Game::new(), Stone::Black), 0);
+    }
+
+    #[test]
+    fn la_note_change_de_signe_avec_le_point_de_vue() {
+        let mut g = game(&[(3, 3), (6, 3), (9, 9)], &[(4, 3), (5, 3), (10, 10)]);
+        g.captured_black = 4;
+        g.captured_white = 2;
+        assert_eq!(evaluate(&g, Stone::Black), -evaluate(&g, Stone::White));
+    }
+
+    #[test]
+    fn plus_de_captures_meilleure_note() {
+        let mut g = Game::new();
+        g.captured_black = 4;
+        assert!(evaluate(&g, Stone::Black) > 0);
+        assert!(evaluate(&g, Stone::White) < 0);
+    }
+}
+
+mod chapitre_13_minmax {
+    use super::*;
+    use crate::eval::evaluate;
+
+    // Les noirs peuvent capturer la paire blanche (4,3)(5,3) en jouant (6,3).
+    fn capture_possible() -> Game {
+        game(&[(3, 3), (9, 9)], &[(4, 3), (5, 3), (10, 10)])
+    }
+
+    #[test]
+    fn profondeur_0_renvoie_evaluate() {
+        let mut g = capture_possible();
+        assert_eq!(maxi(&mut g, 0, Stone::Black), evaluate(&g, Stone::Black));
+    }
+
+    #[test]
+    fn profondeur_1_trouve_la_capture() {
+        let mut g = capture_possible();
+        // meilleur coup = capturer 2 pierres : evaluate provisoire = 2 * 100
+        assert_eq!(maxi(&mut g, 1, Stone::Black), 200);
+    }
+
+    #[test]
+    fn la_recherche_ne_laisse_aucune_trace() {
+        let mut g = capture_possible();
+        let (board, turn, history) = (g.board, g.turn, g.history.len());
+        maxi(&mut g, 2, Stone::Black);
+        assert!(g.board == board);
+        assert!(g.turn == turn);
+        assert_eq!(g.history.len(), history);
+        assert_eq!((g.captured_black, g.captured_white), (0, 0));
     }
 }

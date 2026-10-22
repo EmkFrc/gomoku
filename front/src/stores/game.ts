@@ -125,6 +125,8 @@ async function askSuggestion(): Promise<void> {
     const result = await api.suggestMove();
     suggestion.value = result.coord;
     state.value.ai = result.report;
+  } catch {
+    // Pas encore d'IA côté Rust : on laisse simplement la partie telle quelle.
   } finally {
     suggesting.value = false;
   }

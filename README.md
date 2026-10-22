@@ -14,7 +14,7 @@ Frontend : Tauri (GUI) | Vue.js (framwork) | Typescript (Langage)
 
 Backend : Rust (Langage)
 
-## Developppeur 
+## Developppeurs 
 
 Efranco
 
